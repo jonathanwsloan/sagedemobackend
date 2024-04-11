@@ -1,0 +1,26 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "description": "sage demo backend",
+  "main": "index.js",
+  "scripts": {
+    "serve": "cross-env USE_TEST_SUPABASE=true nodemon ./index.cjs",
+    "serve-prod": "cross-env USE_TEST_SUPABASE=false nodemon ./index.cjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jonathanwsloan/sagedemobackend.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/jonathanwsloan/sagedemobackend/issues"
+  },
+  "homepage": "https://github.com/jonathanwsloan/sagedemobackend#readme",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.42.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  }
+}
