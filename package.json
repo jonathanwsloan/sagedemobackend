@@ -4,6 +4,7 @@
   "description": "sage demo backend",
   "main": "index.js",
   "scripts": {
+    "start": "node index.cjs",
     "serve": "cross-env USE_TEST_SUPABASE=true nodemon ./index.cjs",
     "serve-prod": "cross-env USE_TEST_SUPABASE=false nodemon ./index.cjs"
   },
