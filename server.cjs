@@ -2,8 +2,7 @@ require("dotenv").config();
 const OpenAI = require("openai");
 const fs = require("fs");
 const path = require("path");
-const chatsPath = path.join(__dirname, "../data/chats.json");
-const assistantsPath = path.join(__dirname, "../data/assistants.json");
+const assistantsPath = path.join(__dirname, "./data/assistants.json");
 const { fetchData, insertData } = require("./db.cjs");
 
 const instructions = {

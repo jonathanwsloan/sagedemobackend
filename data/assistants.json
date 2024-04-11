@@ -1,0 +1,27 @@
+{
+  "coldWar": {
+    "id": "asst_NnIGWGjrxskWOap198yYupv7",
+    "description": "study assistant for questions about the cold war",
+    "prompt": "basicSocraticPrompt"
+  },
+  "atomicStructure": {
+    "id": "asst_YqaGRx1UOYZUy9GN0uKK7Lv9",
+    "description": "study assistant for questions about chemistry",
+    "prompt": "middleSchoolSocratic"
+  },
+  "pharmacyExam": {
+    "id": "asst_cGGqCM6XvpJXremMZYNxNJkq",
+    "description": "study assistant for questions about the NAPLEX or pharmacy",
+    "prompt": "You are a NAPLEX exam and pharmacy study assistant. basicReasoningPrompt"
+  },
+  "dentalHygienist": {
+    "id": "asst_ev29AsVkfGNjIuLy4V995cot",
+    "description": "study assistant for questions about dentistry or skills of a dental hygienist",
+    "prompt": "You are a dentistry and dental hygniest study assistant. basicReasoningPrompt"
+  },
+  "accounting": {
+    "id": "asst_wPf0t03DVI5zGKwfLH2nh5XO",
+    "description": "study assistant for questions about accounting or finanacial statements",
+    "prompt": "middleSchoolReasoning"
+  }
+}
