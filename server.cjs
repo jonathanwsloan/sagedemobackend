@@ -52,7 +52,7 @@ function delay(ms) {
 }
 
 const chatWithAssistant = async (req, res) => {
-  const { prompt, threadId, assistantName } = req.body;
+  const { prompt, threadId, assistantName, uid } = req.body;
   console.log("body", req.body);
   const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
@@ -142,10 +142,15 @@ const chatWithAssistant = async (req, res) => {
       });
       await insertData("chats", {
         thread_id: thread.id,
-        messages: formattedMessages,
-        usage: { ...(currentChat?.usage || {}), [run.id]: run.usage },
+        messages: JSON.stringify(formattedMessages),
+        usage: JSON.stringify({
+          ...(currentChat?.usage || {}),
+          [run.id]: run.usage,
+        }),
         title: titleCompletion?.choices?.[0]?.message?.content,
         assistant_name: chooseAssistant,
+        user_id: uid,
+        ...(!currentChat ? { created_at: new Date() } : {}),
       });
     } catch (err) {
       console.error("Error writing to chats file:", err);

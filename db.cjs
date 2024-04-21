@@ -9,10 +9,19 @@ const supabaseUrl = USE_TEST_SUPABASE
 const supabaseKey = USE_TEST_SUPABASE
   ? process.env.VITE_SUPABASE_TEST_ANON_KEY
   : process.env.VITE_SUPABASE_ANON_KEY;
+const subapasePassword = USE_TEST_SUPABASE
+  ? process.env.VITE_SUPABASE_TEST_PASSWORD
+  : process.env.VITE_SUPABASE_PASSWORD;
 
-console.log("supabase: ", supabaseUrl, supabaseKey);
+console.log("supabase: ", supabaseUrl, subapasePassword);
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createClient(supabaseUrl, subapasePassword, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+    detectSessionInUrl: false,
+  },
+});
 
 /**
  * Function to fetch data from a given table in Supabase.
