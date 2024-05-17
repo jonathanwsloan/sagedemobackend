@@ -1,4 +1,6 @@
 require("dotenv").config();
+const axios = require("axios");
+const PptxGenJS = require("pptxgenjs");
 const OpenAI = require("openai");
 const fs = require("fs");
 const path = require("path");
@@ -186,7 +188,7 @@ const createAssistant = async (req, res) => {
     const assistant = await openai.assistants.create({
       name: assistantId,
       description: description,
-      model: "gpt-4-turbo-preview",
+      model: "gpt-4o",
       tools: [{ type: "retrieval" }],
       file_ids: uploadedFiles.map((file) => file.id),
     });
@@ -219,4 +221,364 @@ const createAssistant = async (req, res) => {
   }
 };
 
-module.exports = { chatWithAssistant, createAssistant };
+const createCourseCurriulum = async (req, res) => {
+  const {
+    lengthOfClassTotal,
+    lengthOfClassPerSession,
+    sessionsPerWeek,
+    gradeOrAge,
+    numberOfStudents,
+    certificatesOrStandards,
+    equipmentQuestions,
+  } = req.body;
+
+  const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+  const folder = "tmp/" + Math.random().toString(36).substring(2, 10);
+
+  // Create the folder if it doesn't exist
+  if (!fs.existsSync(folder)) {
+    fs.mkdirSync(folder, { recursive: true });
+    console.log("Folder created:", folder);
+  } else {
+    console.log("Folder already exists:", folder);
+  }
+
+  const curriculumPrompt = `
+    You are assisting a teacher who is teaching students to pass the ${certificatesOrStandards} over ${lengthOfClassTotal}. 
+    Students are in ${gradeOrAge} and the class meets ${sessionsPerWeek} times per week, with each session lasting for ${lengthOfClassPerSession}. 
+    The class has ${numberOfStudents} students. 
+    Please create a curriculum for this class, taking into account the proper prerequisites for each subject, and keeping it feasible for the students based on their grade or age. 
+    ${equipmentQuestions.map((q) => q).join("\n")}
+
+    Start by listing the the blocks of 3 weeks each with a title and a brief description of what will be covered in that time. Then create a detailed curriculum for the ${lengthOfClassTotal} curriculum in markdown format.
+    Respond in this JSON format:
+    {
+      blocks: [
+        {
+          title: "Week 1",
+          description: "This week we will cover...",
+        },
+        {
+          title: "Week 2",
+          description: "This week we will cover...",
+        }, etc.
+      ]
+      fullCurriculum: "Your full curriculum in markdown format here."
+    }
+  `;
+
+  try {
+    console.log("Generating curriculum...");
+    const curriculumResponse = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [{ role: "user", content: curriculumPrompt }],
+      response_format: { type: "json_object" },
+      // max_tokens: 1500,
+    });
+
+    const curriculum = JSON.parse(
+      curriculumResponse.choices[0].message.content
+    );
+    console.log("Curriculum generated:", curriculum);
+    const curriculumFilePath = path.join(__dirname, folder, "curriculum.md");
+
+    fs.writeFile(curriculumFilePath, curriculum.fullCurriculum, (err) => {
+      if (err) {
+        console.error("Error saving data to file:", err);
+      } else {
+        console.log("Data successfully saved to", curriculumFilePath);
+      }
+    });
+
+    const lessonPlanPrompt = `
+Continuing from your prior response, can you please create a detailed lesson plan for what the first 3 weeks of Year 1 would be, so that the teacher can instantly start using it? Please take a minute and think it through. 
+Be extremely detailed and provide a clear structure for each day. Each day should consist of a title, description, and have information enough to fill a day's worth of powerpoint slides. For each slide, provide a title and the actual content that should be on the slide. Include definitions, examples, and exercises so that the slides are immediately usable without further preparation.
+Respond in markdown format.
+`;
+
+    console.log("Generating lesson plan...");
+    const lessonPlanResponse = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "user", content: curriculumPrompt },
+        { role: "assistant", content: JSON.stringify(curriculum) },
+        { role: "user", content: lessonPlanPrompt },
+      ],
+    });
+
+    const lessonPlan = lessonPlanResponse.choices[0].message.content;
+    console.log("Lesson plan generated:", lessonPlan);
+    const lessonPlanFilePath = path.join(__dirname, folder, "lessonPlan.md");
+
+    fs.writeFile(lessonPlanFilePath, lessonPlan, (err) => {
+      if (err) {
+        console.error("Error saving data to file:", err);
+      } else {
+        console.log("Data successfully saved to", lessonPlanFilePath);
+      }
+    });
+
+    const slideCreationPrompt = `
+Continuing from your prior response, can you please create slide content for the first week so that the teacher can instantly start using it? Please take a minute and think it through.
+Be extremely detailed and provide a clear structure for each day.
+Start each day with a teacher's notes slide, explaining the desired outcome for the day and what will be covered. Then include a title page with a description for the students. 
+Then, each slide after should consist of a title, image idea(s) and the content for the actual slide explaining the material or prompting the students with questions. Include definitions, examples, and exercises so that the slides are immediately usable without further preparation.
+
+Here is an example of the level of detail expected:
+Title: States Rights in the Civil War
+Content: 
+- The South believed if laws passed by the national or federal government were unfair they wouldn’t have to follow federal laws.
+  - Remember the Nullification Crisis during Andrew Jackson’s presidency in 1832? Almost from the start of the U.S. the south has had a different view point on how they should be governed. 
+  - This is why the South names their country the Confederate States of America.
+    - Federal = Strong National Gov’t
+    - Confederate = Weak National Gov’t (States over Nation)
+Imagery: Scales weighing the balance between states and federal government.
+
+Respond in markdown format.
+`;
+
+    console.log("Generating lesson plan...");
+    const slidesResponse = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "user", content: curriculumPrompt },
+        { role: "assistant", content: JSON.stringify(curriculum) },
+        { role: "user", content: lessonPlanPrompt },
+        { role: "assistant", content: lessonPlan },
+        { role: "user", content: slideCreationPrompt },
+      ],
+    });
+
+    const slidesPlan = slidesResponse.choices[0].message.content;
+    console.log("slides plan generated:", slidesPlan);
+    const slidesPlanFilePath = path.join(__dirname, folder, "slidesPlan.md");
+
+    fs.writeFile(slidesPlanFilePath, slidesPlan, (err) => {
+      if (err) {
+        console.error("Error saving data to file:", err);
+      } else {
+        console.log("Data successfully saved to", slidesPlanFilePath);
+      }
+    });
+    await generateContentAndPPT({
+      content: slidesPlan,
+      fileLocation: path.join(__dirname, folder, "slides.pptx"),
+    });
+    console.log("Content and PowerPoint presentation generated");
+    return res.json({ curriculum, lessonPlan });
+    const homeworkPrompt = `
+      Continuing from your prior response, can you please create a detailed homework/project plan for what the first 3 weeks of Year 1 would be, so that the teacher can instantly start using it? Please take a minute and think it through. Respond in markdown format.
+    `;
+
+    console.log("Generating homework...");
+    const homeworkResponse = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "user", content: curriculumPrompt },
+        { role: "assistant", content: JSON.stringify(curriculum) },
+        { role: "user", content: lessonPlanPrompt },
+        { role: "assistant", content: lessonPlan },
+        { role: "user", content: homeworkPrompt },
+      ],
+      // max_tokens: 1500,
+    });
+
+    const homework = homeworkResponse.choices[0].message.content;
+    console.log("Homework generated:", homework);
+
+    const homeworkFilePath = path.join(
+      __dirname,
+      folder,
+      generateRandomFilename() + ".md"
+    );
+
+    fs.writeFile(homeworkFilePath, homework, (err) => {
+      if (err) {
+        console.error("Error saving data to file:", err);
+      } else {
+        console.log("Data successfully saved to", homeworkFilePath);
+      }
+    });
+
+    const quizPrompt = `
+      In your 3 week lesson plan, you include a quiz at the end of Week 3. Can you please create that quiz in enough detail that the teacher can give directly to the students? Respond in markdown format.
+    `;
+
+    console.log("Generating quiz...");
+    const quizResponse = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "user", content: curriculumPrompt },
+        { role: "assistant", content: JSON.stringify(curriculum) },
+        { role: "user", content: lessonPlanPrompt },
+        { role: "assistant", content: lessonPlan },
+        { role: "user", content: homeworkPrompt },
+        { role: "assistant", content: homework },
+        { role: "user", content: quizPrompt },
+      ],
+      // max_tokens: 1500,
+    });
+
+    const quiz = quizResponse.choices[0].message.content;
+    console.log("Quiz generated:", quiz);
+    const quizFilePath = path.join(
+      __dirname,
+      folder,
+      generateRandomFilename() + ".md"
+    );
+
+    fs.writeFile(quizFilePath, quiz, (err) => {
+      if (err) {
+        console.error("Error saving data to file:", err);
+      } else {
+        console.log("Data successfully saved to", quizFilePath);
+      }
+    });
+
+    const dataToSave = {
+      curriculum,
+      lessonPlan,
+      homework,
+      quiz,
+    };
+    const randomFilePath = path.join(
+      __dirname,
+      folder,
+      generateRandomFilename()
+    );
+
+    fs.writeFile(randomFilePath, JSON.stringify(dataToSave, null, 2), (err) => {
+      if (err) {
+        console.error("Error saving data to file:", err);
+      } else {
+        console.log("Data successfully saved to", randomFilePath);
+      }
+    });
+
+    // insertData("curriculums", {
+    //   lengthOfClassTotal,
+    //   lengthOfClassPerSession,
+    //   sessionsPerWeek,
+    //   gradeOrAge,
+    //   numberOfStudents,
+    //   certificatesOrStandards,
+    //   equipmentQuestions,
+    //   curriculum,
+    //   lessonPlan,
+    //   homework,
+    //   quiz,
+    // });
+
+    res.json({ curriculum, lessonPlan, homework, quiz });
+  } catch (error) {
+    console.error("Error generating curriculum:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+// Set your API keys
+const UNSPLASH_ACCESS_KEY = "YOUR_UNSPLASH_ACCESS_KEY";
+
+async function generateContentAndPPT({ content, fileLocation }) {
+  console.log("Generating content and PowerPoint presentation...");
+  // Step 1: Generate formatted content and image ideas using GPT-4
+  const formattedContent = await generateFormattedContent(content);
+
+  // Step 2: Fetch images based on the ideas
+  const images = []; // await fetchImages(formattedContent.imageIdeas);
+
+  // Step 3: Create a PowerPoint presentation
+  const ppt = new PptxGenJS();
+  formattedContent.slides.forEach((section, index) => {
+    const slide = ppt.addSlide();
+    slide.addText(section.title, { x: 0.5, y: 0.5, h: "10%", fontSize: 24 });
+    slide.addText(section.content, {
+      x: 0.5,
+      y: 1,
+      h: "75%",
+      w: "60%",
+      fontSize: 14,
+    });
+
+    if (images[index]) {
+      slide.addImage({ path: images[index], x: 7, y: 2, w: 2.5, h: 3 });
+    } else {
+      slide.addImage({
+        path: "https://ralfvanveen.com/wp-content/uploads/2021/06/Placeholder-_-Glossary-1200x675.webp",
+        x: 7,
+        y: 0.5,
+        w: 2.5,
+        h: 3,
+      });
+    }
+  });
+
+  // Step 4: Save the presentation
+  await ppt.writeFile({ fileName: fileLocation });
+}
+
+// Function to generate formatted content and image ideas using GPT-4
+async function generateFormattedContent(content) {
+  const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      {
+        role: "user",
+        content: `I am turning the content provided into a powerpoint presentation to use in a class. Take the following content and format it into sections with titles, slide content, and suggest image ideas for each section.\n\n${content}.
+If the content does not have enough detail to create a slide, please expand on it to make it more suitable for a presentation.
+Respond in the following JSON format:
+{slides: [
+  {
+    "title": "Section Title",
+    "content": "Section content goes here.",
+    "imageIdea": "Image idea goes here."
+  },
+  {
+    "title": "Section Title",
+    "content": "Section content goes here.",
+    "imageIdea": "Image idea goes here."
+  }, etc.
+]}`,
+      },
+    ],
+    response_format: { type: "json_object" },
+  });
+
+  const gptOutput = JSON.parse(response.choices[0].message.content);
+
+  return gptOutput;
+}
+
+// Function to fetch images from Unsplash
+async function fetchImages(imageIdeas) {
+  const imageUrls = await Promise.all(
+    imageIdeas.map(async (idea) => {
+      const response = await axios.get(
+        "https://api.unsplash.com/photos/random",
+        {
+          params: { query: idea, orientation: "landscape" },
+          headers: {
+            Authorization: `Client-ID ${UNSPLASH_ACCESS_KEY}`,
+          },
+        }
+      );
+      return response.data.urls.regular;
+    })
+  );
+
+  return imageUrls;
+}
+
+module.exports = { chatWithAssistant, createAssistant, createCourseCurriulum };
+
+const generateRandomFilename = () => {
+  const timestamp = new Date().toISOString().replace(/[-:.]/g, "");
+  const randomString = Math.random().toString(36).substring(2, 10);
+  return `file_${timestamp}_${randomString}`;
+};
